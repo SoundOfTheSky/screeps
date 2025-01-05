@@ -1,25 +1,30 @@
-import { $room } from './behavior/room';
-import { $creep } from './behavior/creep';
-import { tickCache } from './cache';
+import { $creep } from './behavior/creep/$creep'
+import { $room } from './behavior/room/$room'
+import { tickCache } from './cache'
+import { hookUpProfiler, logProfiler } from './utils/profiler'
 
-if (!Memory.cache) Memory.cache = {};
+// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+if (!Memory.cache) Memory.cache = {}
+hookUpProfiler()
 
 export function loop() {
-  console.log('====== NEW TICK ======');
-  // Clear tick storage every tick
-  for (const key in tickCache) delete tickCache[key as keyof typeof tickCache];
-  // Decrease ticks in cache
-  for (const key in Memory.cache) {
-    const val = Memory.cache[key]!;
-    if (val.ticks && --val.ticks <= 0) delete Memory.cache[key];
-  }
+  try {
+    const time = performance.now()
+    tickCache()
+    for (const roomName in Game.rooms) $room(Game.rooms[roomName])
+    // for (const structureId in Game.structures) {
+    //   const structure = Game.structures[structureId];
+    //   if (structure.structureType === STRUCTURE_TERMINAL) $tower(structure as StructureTower);
+    // }
+    for (const creepName in Game.creeps) $creep(Game.creeps[creepName])
 
-  for (const roomName in Game.rooms) $room(Game.rooms[roomName]);
-  // for (const structureId in Game.structures) {
-  //   const structure = Game.structures[structureId];
-  //   if (structure.structureType === STRUCTURE_TERMINAL) $tower(structure as StructureTower);
-  // }
-  for (const creepName in Game.creeps) {
-    $creep(Game.creeps[creepName]);
+    const timeTook = performance.now() - time
+    if (timeTook > 4) console.log(`====== [${timeTook}ms] ======`)
+    if (Game.time % 200 === 0) logProfiler()
+  }
+  catch (error) {
+    if (error instanceof Error)
+      console.error(error.name, error.message, error.stack)
+    else console.error(error)
   }
 }

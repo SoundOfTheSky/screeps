@@ -4,25 +4,17 @@
   "license": "MIT",
   "scripts": {
     "upload": "node dist/upload",
-    "build": "rm -rf dist && tsc",
-    "start": "npm run build && npm run upload",
-    "lint": "eslint \"src/**/*{.js,.ts}\" --fix"
+    "build": "bun build ./src/main/main.ts --outfile=dist.js",
+    "start": "rm -f dist.js && bun run build && bun run src/upload.js",
+    "start:node": "npm run build && npm run upload",
+    "lint": "eslint \"src/**/*{.js,.ts}\" --fix && tsc"
   },
   "dependencies": {
-    "@types/screeps": "latest",
-    "got": "latest",
-    "tslib": "latest"
+    "@softsky/utils": "^1.0.5"
   },
   "devDependencies": {
-    "@types/got": "latest",
-    "@types/node": "14",
-    "@typescript-eslint/eslint-plugin": "latest",
-    "@typescript-eslint/parser": "latest",
-    "eslint": "latest",
-    "eslint-config-prettier": "latest",
-    "eslint-plugin-prettier": "latest",
-    "eslint-plugin-sonarjs": "latest",
-    "prettier": "latest",
-    "typescript": "latest"
+    "@types/node": "^14.18.63",
+    "@types/screeps": "^3.3.8",
+    "@softsky/configs": "^1.0.8"
   }
 }
