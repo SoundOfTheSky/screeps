@@ -12,6 +12,7 @@ export default [
       'unicorn/no-array-callback-reference': 0,
       'unicorn/prefer-modern-math-apis': 0, // Bruh, "modern" math apis are slow af
       'prefer-math-min-max': 0, // Tenary is faster
+      'unicorn/prefer-code-point': 0,
     }
   }
 ];
