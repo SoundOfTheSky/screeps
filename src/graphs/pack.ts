@@ -7,58 +7,31 @@
  * - Removed id packing because it's broken for characters in range 0xd800 - 0xdfff
  */
 
-import { measurePerformance } from '@softsky/utils'
-
 import { Pos } from './pos'
 
-/**
- * Reduce matrix size compared to `matrix.serialize()` in half
- */
-export function packMatrix(matrix: CostMatrix) {
-  let result = ''
-  for (let x = 0; x < 50; x++)
-    for (let y = 0; y < 50; y++)
-      result += String.fromCharCode(matrix.get(x, y) + 65)
-  return result
+const CHAR_START = 93
+
+/** Pack number from 0 to 65442 to one letter */
+export function packNumber(number: number) {
+  return String.fromCharCode(number + CHAR_START)
 }
 
-/**
- * Reduce matrix size compared to `matrix.serialize()` in half
- */
-export function unpackMatrix(packed: string) {
-  const m = new PathFinder.CostMatrix()
-  for (let x = 0; x < 50; x++)
-    for (let y = 0; y < 50; y++)
-      m.set(x, y, packed.charCodeAt(x * 50 + y) - 65)
+/** Decoding number from 0 to 65442 */
+export function unpackNumber(packed: string, index = 1) {
+  return packed.charCodeAt(index) - CHAR_START
 }
 
-const matrix = new PathFinder.CostMatrix()
-for (let x = 0; x < 50; x++)
-  for (let y = 0; y < 50; y++)
-    matrix.set(x, y, ~~(Math.random() * 255))
-
-console.log(1, measurePerformance(() => {
-  packMatrix(matrix)
-}))
-const m = packMatrix(matrix)
-console.log(2, measurePerformance(() => {
-  unpackMatrix(m)
-}))
-/**
- * Reduce stringified size by 80%
- */
+/** Reduce stringified size by 80% */
 export function packPos({ x, y }: Pos): string {
-  return String.fromCharCode(((x << 6) | y) + 65)
+  return packNumber(((x << 6) | y))
 }
 
 export function unpackPos(char: string): Pos {
-  const index = char.charCodeAt(0) - 65
+  const index = char.charCodeAt(0) - CHAR_START
   return { x: (index & 0b1111_1100_0000) >>> 6, y: index & 0b0000_0011_1111 }
 }
 
-/**
- * Reduce stringified size by 94%
- */
+/** Reduce stringified size by 94% */
 export function packPosList(posList: Pos[]): string {
   let result = ''
   for (let index = 0; index < posList.length; index++)
@@ -74,6 +47,7 @@ export function unpackPosList(chars: string): Pos[] {
   return result as Pos[]
 }
 
+/** Reduce stringified size by 87% */
 export function packRoomName(roomName: string): string {
   if (roomName === 'sim') return '㺀'
   let x = ''
@@ -92,14 +66,14 @@ export function packRoomName(roomName: string): string {
       }
     }
   }
-  return String.fromCharCode(
-    ((quadrant << 12) | (Number.parseInt(x) << 6) | Number.parseInt(y)) + 65,
+  return packNumber(
+    ((quadrant << 12) | (Number.parseInt(x) << 6) | Number.parseInt(y)),
   )
 }
 
 export function unpackRoomName(char: string): string {
   if (char === '㺀') return 'sim'
-  const number_ = char.charCodeAt(0) - 65
+  const number_ = char.charCodeAt(0) - CHAR_START
   const x = (number_ & 0b00_1111_1100_0000) >>> 6
   const y = number_ & 0b00_0000_0011_1111
   switch (((number_ & 0b11_0000_0011_1111) >>> 12) as 0 | 1 | 2 | 3) {
@@ -118,9 +92,7 @@ export function unpackRoomName(char: string): string {
   }
 }
 
-/**
- * Reduce stringified size by 90%
- */
+/** Reduce stringified size by 90% */
 export function packRoomPosition(pos: RoomPosition): string {
   return packPos(pos) + packRoomName(pos.roomName)
 }
@@ -130,9 +102,7 @@ export function unpackRoomPosition(chars: string): RoomPosition {
   return new RoomPosition(x, y, unpackRoomName(chars[1]))
 }
 
-/**
- * Reduce stringified size by 95%
- */
+/** Reduce stringified size by 95% */
 export function packRoomPositionList(posList: RoomPosition[]): string {
   let result = ''
   for (let index = 0; index < posList.length; ++index)
@@ -145,4 +115,48 @@ export function unpackRoomPositionList(chars: string): RoomPosition[] {
   for (let index = 0; index < chars.length; index += 2)
     posList.push(unpackRoomPosition(chars.slice(index, index + 2)))
   return posList
+}
+
+/**  Reduce stringified size by more than 96% */
+export function packPathfinderPath(path: PathFinderPath) {
+  return `${
+    path.incomplete ? '1' : '0'}${
+    packNumber(path.cost)}${
+    packNumber(path.ops)}${
+    packRoomPositionList(path.path)}`
+}
+
+export function unpackPathfinderPath(packed: string): PathFinderPath {
+  return {
+    incomplete: packed[0] === '1',
+    cost: unpackNumber(packed, 1),
+    ops: unpackNumber(packed, 2),
+    path: unpackRoomPositionList(packed.slice(3)),
+  }
+}
+/** Reduce matrix size compared to `matrix.serialize()` to 25% */
+export function packMatrix(matrix: CostMatrix) {
+  let result = ''
+  for (let x = 0; x < 50; x++)
+    for (let y = 0; y < 50; y += 2)
+      result += packNumber(
+        (matrix.get(x, y) << 8) | (matrix.get(x, y + 1)),
+      )
+  return result
+}
+
+export function unpackMatrix(packed: string) {
+  const m = new PathFinder.CostMatrix()
+  let x = 0
+  let y = 0
+  for (let index = 0; index < packed.length; index++) {
+    const number_ = unpackNumber(packed, index)
+    m.set(x, y++, number_ >> 8)
+    m.set(x, y++, number_ & 0xFF)
+    if (y === 50) {
+      y = 0
+      x++
+    }
+  }
+  return m
 }

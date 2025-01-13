@@ -36,8 +36,8 @@ declare global {
   interface CreepMemory {
     /** Tasks */
     t: Task[]
-    /** move [startPos,pathIndex,stuckTicks,nextPos?] */
-    m?: [string, number, number, string?]
+    /** move [startPos,pathIndex,stuckTicks] */
+    m?: [string, number, number]
     /** Give way [direction, stun] */
     w?: [number, number]
 

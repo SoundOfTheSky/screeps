@@ -1,8 +1,7 @@
-/* eslint-disable unicorn/prefer-code-point */
 // === Timeouts ===
 export const MEMORY_VALIDATE_INTERVAL = 3600
 export const ROOM_RESCAN_INTERVAL = 3600
-export const ROOM_PATH_TIMEOUT = 3600
+export const PATHFINDER_TIMEOUT = 3600
 export const ROOM_MATRIX_TIMEOUT = 3600
 export const DEFAULT_CACHE_TIMEOUT = 600
 export const BEHAVIOR_CACHE_TIMEOUT = 3600

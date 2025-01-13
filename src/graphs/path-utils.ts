@@ -1,6 +1,6 @@
 import { DIRECTION_DELTA, Pos } from './pos'
 
-export function drawPath(startPos: RoomPosition, path: DirectionConstant[]) {
+export function drawPathFromDirections(startPos: RoomPosition, path: DirectionConstant[]) {
   const pos: [number, number] = [startPos.x, startPos.y]
   const room = Game.rooms[startPos.roomName]
   for (let index = 0; index < path.length; index++) {

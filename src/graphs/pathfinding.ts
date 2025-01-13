@@ -1,6 +1,7 @@
-import { NAMES, ROOM_MATRIX_TIMEOUT, ROOM_PATH_TIMEOUT } from '../consts'
+import { NAMES, PATHFINDER_TIMEOUT } from '../consts'
+import { useCache } from '../memory'
 
-import { packRoomName, packRoomPosition } from './pack'
+import { packMatrix, packPathfinderPath, packRoomName, packRoomPosition, unpackMatrix, unpackPathfinderPath } from './pack'
 import { PosIndex } from './pos'
 
 type AStarNode = {
@@ -100,115 +101,59 @@ export function bfs(options: {
   }
 }
 
-/**
- * Returns directions to path.
- */
 export function getPath(
   start: RoomPosition,
   end: RoomPosition,
-  options: FindPathOpts = {},
-): DirectionConstant[] | undefined {
+  range = 1,
+  options: PathFinderOpts = {},
+) {
   // Find path in cache
   const key = `${NAMES.PATH}${packRoomPosition(start)}${packRoomPosition(end)}`
   const cache = Memory.cache[key]
-  if (cache) return [...(cache.r as string)].map(x => +x as DirectionConstant)
-
-  // If no custom costCallback set, use cached matrix or generate one
-  if (!options.costCallback) {
-    const matrixKey = `${NAMES.HAVE_MATRIX}${packRoomName(start.roomName)}`
-    let matrix = Memory.cache[matr ixKey]?.r as number[] | undefined
-    if (!matrix) {
-      matrix = buildCostMatrixForRoom(Game.rooms[start.roomName]).serialize()
-      Memory.cache[matrixKey] = {
-        r: matrix,
-        t: ROOM_MATRIX_TIMEOUT,
-      }
-    }
-    options.costCallback = () => PathFinder.CostMatrix.deserialize(matrix)
-  }
-
+  if (cache) return unpackPathfinderPath(cache.r as string)
   // Find path
-  PathFinder.search(start, { pos: end, range: 1 }, {
+  const result = PathFinder.search(start, { pos: end, range }, {
     plainCost: 2,
     swampCost: 10,
     roomCallback(roomName) {
-      const room = Game.rooms[roomName] as Room | undefined
-      if (!room) return
-      const costs = new PathFinder.CostMatrix()
-      for (const struct of room.find(FIND_STRUCTURES)) {
-        if (struct.structureType === STRUCTURE_ROAD) {
-          // Favor roads over plain tiles
-          costs.set(struct.pos.x, struct.pos.y, 1)
-        }
-        else if (struct.structureType !== STRUCTURE_CONTAINER
-          && (struct.structureType !== STRUCTURE_RAMPART
-            || !struct.my)) {
-          // Can't walk through non-walkable buildings
-          costs.set(struct.pos.x, struct.pos.y, 0xFF)
-        }
-      }
-
-      // Avoid creeps in the room
-      for (const creep of room.find(FIND_CREEPS)) {
-        costs.set(creep.pos.x, creep.pos.y, 0xFF)
-      }
-
-      return costs
+      const encodedMatrix = useCache(`${NAMES.HAVE_MATRIX}${packRoomName(roomName)}`, () => buildCostMatrixForRoom(roomName))
+      if (encodedMatrix === undefined) return false
+      return unpackMatrix(encodedMatrix)
     },
+    ...options,
   })
-  const result = start.findPathTo(end, options).map(p => p.direction)
   Memory.cache[key] = {
-    k: '',
-    r: result.join(''),
-    t: ROOM_PATH_TIMEOUT,
+    r: packPathfinderPath(result),
+    t: PATHFINDER_TIMEOUT,
   }
   return result
 }
 
-export function buildCostMatrixForRoom(room: Room) {
-  console.log(`[${room.name}] Building room matrix...`)
+export function buildCostMatrixForRoom(roomName: string) {
+  console.log(`[${roomName}] Building room matrix...`)
+  const room = Game.rooms[roomName] as Room | undefined
+  if (!room) return
   const matrix = new PathFinder.CostMatrix()
-  const terrain = room.getTerrain()
-  for (let x = 0; x < 50; x++)
-    for (let y = 0; y < 50; y++) {
-      const terra = terrain.get(x, y)
-      // If wall, dont change
-      if (terra === 1) continue
-      // If exit set as really unpreferrable
-      if (x === 0 || y === 0) {
-        matrix.set(x, y, 50)
-        continue
-      }
-      const look = room.lookAt(x, y)
-      // If obstacle set as unwalkable, skip creeps
-      if (
-        look.some(
-          p =>
-            p.type !== 'creep'
-            && OBSTACLE_OBJECT_TYPES.includes(
-              (p.structure?.structureType
-                ?? p.constructionSite?.structureType
-                ?? p.type) as (typeof OBSTACLE_OBJECT_TYPES)[0],
-            ),
-        )
-      )
-        matrix.set(x, y, 255)
-      // If not moving creep set as unpreferrable
-      else if (
-        look.some(x => x.creep && !x.creep.spawning && (!x.creep.my || !x.creep.memory.m))
-      )
-        matrix.set(x, y, 250)
-      // If road or construction of road
-      else if (
-        look.some(
-          x =>
-            x.structure?.structureType === 'road'
-            || x.constructionSite?.structureType === 'road',
-        )
-      )
-        matrix.set(x, y, 1)
-      // If swamp set to 10, if plain 2
-      else matrix.set(x, y, terra === 2 ? 10 : 2)
-    }
-  return matrix
+  for (const struct of room.find(FIND_STRUCTURES)) {
+    if (struct.structureType === STRUCTURE_ROAD) matrix.set(struct.pos.x, struct.pos.y, 1)
+    else if (struct.structureType !== STRUCTURE_CONTAINER
+      && (struct.structureType !== STRUCTURE_RAMPART
+        || !struct.my))
+      matrix.set(struct.pos.x, struct.pos.y, 0xFF)
+  }
+  for (const creep of room.find(FIND_CREEPS))
+    if (!creep.memory.m)
+      matrix.set(creep.pos.x, creep.pos.y, 0xFF)
+  return packMatrix(matrix)
+}
+
+export function getDirectionsFromPath(path: RoomPosition[]) {
+  let lastPos = path[0]
+  const directions = new Array(path.length - 1)
+  for (let index = 0; index < path.length; index++) {
+    const pos = path[index]
+    directions[index] = lastPos.getDirectionTo(pos)
+    lastPos = pos
+  }
+  return directions as DirectionConstant[]
 }

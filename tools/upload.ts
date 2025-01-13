@@ -1,3 +1,6 @@
+/* eslint-disable import-x/no-nodejs-modules */
+import { writeFileSync } from 'node:fs'
+
 import { transformSync } from '@babel/core'
 
 const ignoreProfileFunctions = new Set([
@@ -8,7 +11,6 @@ const ignoreProfileFunctions = new Set([
   'logProfiler',
   'hookUpProfiler',
 ])
-
 const build = await Bun.build({
   entrypoints: ['./src/index.ts'],
   // sourcemap: 'inline',
@@ -19,7 +21,7 @@ let content = await build.outputs[0]!.text()
 content = content.replace('export {', 'module.exports = {')
 content = content.replace(
   'function hookUpProfiler() {',
-  `function hookUpProfiler() {\n  ${[...content.matchAll(/function\s([^(]+)/g)]
+  `function hookUpProfiler() {\n  ${[...content.matchAll(/^function\s([^(]+)/g)]
     .filter(x => !ignoreProfileFunctions.has(x[1]!))
     .map(x => `  ${x[1]} = profileFunction(${x[1]})`)
     .join('\n')}`,
@@ -30,7 +32,7 @@ content = transformSync(content, {
     node: '10',
   },
 })!.code!
-console.log(content)
+writeFileSync('dist.js', content)
 
 await fetch('https://screeps.com/api/user/code', {
   method: 'POST',

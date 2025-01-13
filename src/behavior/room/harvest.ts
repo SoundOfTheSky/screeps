@@ -27,7 +27,7 @@ export function $harvestRoomEnergy(room: Room) {
     const layout = getBestAvailableCreepLayout(room, {
       move: 0.01,
       work: 1,
-    }, ~~(generationSpeed / 2))
+    }, (generationSpeed / 2) | 0)
     if (!layout) return false
     // Based on generation speed get how many creeps needed
     let creepsNeeded = Math.ceil(generationSpeed / (layout.work! * 2))

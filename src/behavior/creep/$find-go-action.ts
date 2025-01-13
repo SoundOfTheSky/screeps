@@ -1,6 +1,6 @@
 import { useCache } from '../../memory'
 
-import $moveNearTo from './$move-near-to'
+import $moveTo from './$move-near-to'
 
 export default function $findGoAction<T extends { pos: RoomPosition } & _HasId>(
   creep: Creep,
@@ -25,7 +25,7 @@ export default function $findGoAction<T extends { pos: RoomPosition } & _HasId>(
     return // UNDEFINED here because we can retry search
   }
   if (options.say) creep.say(options.say)
-  const _nearTo = $moveNearTo(creep, target.pos)
+  const _nearTo = $moveTo(creep, target.pos)
   if (_nearTo === false) {
     delete Memory.cache[$primaryKey] // UNDEFINED here because we can retry search
     return
